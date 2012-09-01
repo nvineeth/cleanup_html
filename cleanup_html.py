@@ -1,5 +1,4 @@
-#Sri Ramakrishna Saranam
-#Jai Hanuman!
+#Script to clean up html files..experimental
 from html.parser import HTMLParser
 import sys, traceback
 import os
@@ -13,7 +12,12 @@ import urllib.parse
 CSS_REPLACEMENTS = [ 
         ('vivekananda_biography.css', '../main.css'), 
         ('gospel.css', '../main.css'),
-        ("reminiscences_of_sv.css", '../main.css')
+        ("reminiscences_of_sv.css", '../main.css'),
+        ('vol_1.css', '../../main.css'),('vol_2.css', '../../main.css'),
+        ('vol_3.css', '../../main.css'),('vol_4.css', '../../main.css'),
+        ('vol_5.css', '../../main.css'),('vol_6.css', '../../main.css'),
+        ('vol_7.css', '../../main.css'),('vol_8.css', '../../main.css'),
+        ('vol_9.css', '../../main.css')
         ]
 
 
@@ -94,6 +98,7 @@ class FootnoteHTMLParser(HTMLParser):
         self.content += '&%s;' % name
 
     def pre_process_html(self, str):
+        str = str.replace('start -->','>')
         return str.replace("""<style>
 <!--
 
@@ -257,15 +262,11 @@ class CWHTMLParser(HTMLParser):
         self.content += '&%s;' % name
 
     def pre_process_html(self, str):
-        str = str.replace("""<style>
-<!--
-
--->
-</style>""", '')
-
+        str = str.replace('start -->','>')
         return str
 
     def post_process_html(self,str):
+        str = str.replace('start -->','>')
         str = re.sub(">\s*<<\s*<", ' class="arrow"> &larr; <', str);
         str = re.sub(">\s*>>\s*", ' class="arrow"> &rarr;', str);
         str = re.sub(">\s*&lt;\s*&lt;\s*<", ' class="arrow"> &larr; <', str);
@@ -318,15 +319,6 @@ class CWHTMLParser(HTMLParser):
         # replace the css with main css
         for (a,b) in CSS_REPLACEMENTS:
             str = str.replace( a, b)
-
-
-        str = str.replace('_contents.htm','.htm')
-
-        str = str.replace("""<h2>REMINISCENCES OF<br>
-SWAMI VIVEKANANDA</p>
-<p class="center">""", """<h2>REMINISCENCES OF SWAMI VIVEKANANDA <br>""")
-
-        str = str.replace("""<i>Prabuddha Bharata</a>""", """<i>Prabuddha Bharata</i></a>""")
         
         return '<!DOCTYPE html>\n' + str;
 
@@ -384,7 +376,7 @@ def main():
 
     for root, dirs, files in os.walk(sys.argv[1]):
         #also create the output dir
-        out_dir = root.replace(sys.argv[1],sys.argv[2],1)
+        out_dir = os.path.normpath(root.replace(sys.argv[1],sys.argv[2]+'\\',1))
         try:
             os.makedirs(out_dir)
         except:
@@ -408,9 +400,9 @@ def main():
             cwparser.close()
             out_fp.close()
 
-        copy_files( sys.argv[1], sys.argv[2], '*.jpg')
-        copy_files( sys.argv[1], sys.argv[2], '*.pdf')
-        create_validation_script( sys.argv[2] )
+        copy_files( root, out_dir, '*.jpg')
+        copy_files( root, out_dir, '*.pdf')
+        #create_validation_script( sys.argv[2] )
 
 if __name__ == "__main__":
     main()
