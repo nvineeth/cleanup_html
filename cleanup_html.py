@@ -21,6 +21,8 @@ def get_contents_href(html_file, href_link):
         new_link = href_link.replace( os.path.split(href_path)[-1], m.group(1)) # os.path.join( os.path.split(href_link)[0], m.group(1) )
         print('    **Using %s for %s' % (new_link, href_link) )
         return new_link
+    print( 'cannot find replacement for %s' % href_link ) # stop processing and warn.
+    sys.exit(-3)
     return href_link # could not fine contents.
 
 class CWHTMLParser(HTMLParser):
@@ -70,13 +72,28 @@ class CWHTMLParser(HTMLParser):
         if tag not in DTP_SUPPORTED_ATTRIBS:
             logging.debug(" ignoring %s " % tag );
             return;
-
+        
+        onMouseOver = 0
+        onMouseOut = 0
+        href_present = 0
+        page_info = ''
         if tag == 'a':
             for (name,value) in attrs:
                 if name=='href' and value=='#blank':
                     self.process_footnote(attrs)
                     return
-
+                # page no js processing
+                
+                if name=='onmouseover':
+                    onMouseOver = 1
+                    page_info=value.replace('window.status','').replace('=','').replace(';return true','')
+                if name=='onmouseout': onMouseOut = 1
+                if name=='href': href_present = 1
+        # fix the imporperly placed a tag, which is closed by a p
+        if onMouseOver==1 and onMouseOut==1 and href_present==0:
+            self.content += '<!--' + page_info + '-->'
+            return
+            
                    
         # remove the attributes that are not necessary
         attrs_ori = attrs
@@ -85,15 +102,16 @@ class CWHTMLParser(HTMLParser):
         for (attrib,value) in attrs:
             if attrib in DTP_SUPPORTED_ATTRIBS[tag]:
                 # preprocess href of a tag, which point to _frame pages
-                if tag=='a' and attrib=='href' and value.endswith('_frame.htm'):
-                    value = get_contents_href(self.html_file, value)
+                if tag=='a' and attrib=='href':
+                    if value.endswith('_frame.htm'):
+                        value = get_contents_href(self.html_file, value)
+                    elif value.endswith('complete_works_contents.htm'):
+                        value = value.replace('complete_works_contents.htm','complete_works.htm')
                 attrs_filtered.append( (attrib,value) )
             # retain small class for p tags, they are the nav on top
             elif tag=='p' and attrib=='class' and value.lower()=='small' and self.nav_added==0: 
                 htmlClasses += ' nav '
                 self.nav_added = 1
-            elif attrib=='class' and value.lower()=='msobodytext':
-                htmlClasses += ' center '
             elif attrib=='style' and value.find('margin')!=-1 and tag!='table':
                 htmlClasses += ' poem '
             elif attrib=='align' and tag != 'img': #w3c validator
@@ -180,8 +198,8 @@ class CWHTMLParser(HTMLParser):
         str = re.sub("p>\s*<br>\s*<p", "p>\n<p", str);
 
         # make the first occurances of b to h2.
-        str = str.replace('<b>','<h2>', 1)
-        str = str.replace('</b>','</h2>', 1)
+        #str = str.replace('<b>','<h2>', 1)
+        #str = str.replace('</b>','</h2>', 1)
 
         str = re.sub('<p( class="\w+")*>\s*<h2>','<h2>', str)
         str = re.sub('</h2>\s*</p>','</h2>', str)
