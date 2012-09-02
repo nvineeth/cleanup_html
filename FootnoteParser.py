@@ -3,8 +3,12 @@ import os
 import re
 import logging
 from html.parser import HTMLParser
+from ParsingRules import *
 
 class FootnoteHTMLParser(HTMLParser):
+    """ ignores the tags, and puts the text content,
+        so that it can be aggregated as a footnote easily.
+        Also preservers the img"""
     def __init__(self, html_file ):
         HTMLParser.__init__(self)
         self.content = ''
@@ -18,6 +22,13 @@ class FootnoteHTMLParser(HTMLParser):
             self.ignore_data = 1
         if tag == 'br':
             self.content += '<%s/>' % tag;
+        if tag == 'img':
+            attrs_filtered = []
+            for (attrib,value) in attrs:
+                if attrib in DTP_SUPPORTED_ATTRIBS[tag]:
+                    attrs_filtered.append( (attrib,value) )
+            strattrs = "".join([' %s="%s"' % (name, value) for name, value in attrs])
+            self.content += '<img %s>' % strattrs
 
     def handle_endtag(self, tag):
         if tag == 'title':
@@ -65,6 +76,7 @@ class FootnoteHTMLParser(HTMLParser):
             traceback.print_exc(file=sys.stdout)
             sys.stderr.write(msg+'\n')
             logging.critical(msg)
+            sys.exit(-4)
 
         anchor = os.path.split(self.html_file)[-1].split('.')[0]
 
