@@ -8,131 +8,21 @@ import shutil
 import glob
 import urllib
 import urllib.parse
+from FootnoteParser import *
+from ParsingRules import * 
 
-CSS_REPLACEMENTS = [ 
-        ('vivekananda_biography.css', '../main.css'), 
-        ('gospel.css', '../main.css'),
-        ("reminiscences_of_sv.css", '../main.css'),
-        ('vol_1.css', '../../main.css'),('vol_2.css', '../../main.css'),
-        ('vol_3.css', '../../main.css'),('vol_4.css', '../../main.css'),
-        ('vol_5.css', '../../main.css'),('vol_6.css', '../../main.css'),
-        ('vol_7.css', '../../main.css'),('vol_8.css', '../../main.css'),
-        ('vol_9.css', '../../main.css')
-        ]
+def get_contents_href(html_file, href_link):
+    "Opens the _frame.htm file and returns the contents file."
+    href_path = os.path.normpath(os.path.join( os.path.split(html_file)[0], href_link))
+    href_file = open(href_path)
+    href_contents = href_file.read()
+    m = re.search('frame SRC=["]*((\w|-)+.htm)["]* NAME=["]*side["]*',href_contents, re.I)
+    if m is not None:
+        new_link = href_link.replace( os.path.split(href_path)[-1], m.group(1)) # os.path.join( os.path.split(href_link)[0], m.group(1) )
+        print('    **Using %s for %s' % (new_link, href_link) )
+        return new_link
+    return href_link # could not fine contents.
 
-
-DTP_SUPPORTED_ATTRIBS = {
-        'a':[	'href', 'id', 'name' ],
-        'b':['id'],
-        'big':[],
-        'blockquote':['id'],
-        'body':	[],
-        'br':['id'],
-        'center':[],	
-        'cite':[],
-        'dd':[ 'id', 'title'],
-        'del':[],
-        'dfn':[],	
-        'div':['__align',	'id', 'bgcolor'],
-        'em': ['id', 'title'],
-        'font':['color','face','id','size'],
-        'head':[],
-        'h1':[], 'h2':[],'h3':[],'h4':[],'h5':[],'h6':[],
-        'hr':['color', 'id', 'width'],
-        'html':	[],
-        'i':['class','id'],
-        'img':[	'align','border','height','id','src','width'],
-        'li':[	'class','id','title'],
-        'link': [ 'rel', 'type', 'href'],
-        'meta': [ 'http-equiv', 'content'],
-        'ol':[ 'id'],
-        'p':[	'__align','id','title'],
-        's':[	'id','style','title'],
-        'small':[	'id' ],
-        #'span':[	'bgcolor','title'],
-        'strike':[	'class','id'],
-        'strong':	['class','id'],
-        'title': [],
-        'sub':	['id'],
-        'sup':[	'class','id'],
-        'u':[	'id'],
-        'ul':[	'class','id']
-        }
-
-IGNORE_TAGS = ['style']
-
-
-class FootnoteHTMLParser(HTMLParser):
-    def __init__(self, html_file ):
-        HTMLParser.__init__(self)
-        self.content = ''
-        self.html_file = html_file
-        self.ignore_data = 0
-
-        
-    def handle_starttag(self, tag, attrs):
-        #logging.debug("{ %s " % tag)
-        if tag == 'title':
-            self.ignore_data = 1
-        if tag == 'br':
-            self.content += '<%s/>' % tag;
-
-    def handle_endtag(self, tag):
-        if tag == 'title':
-            self.ignore_data = 0
-
-    def handle_data(self, data):
-        if self.ignore_data == 1:
-            return;
-        self.content += data;
-
-    def handle_comment(self, data):
-        print ( 'comment: ' + data )
-        self.content += '<!--' + data + '-->'
-
-    def handle_charref(self, name):
-        #print ('charref : ', name)
-        self.content += '&#%s;' % name
-
-    def handle_entityref(self, name):
-        self.content += '&%s;' % name
-
-    def pre_process_html(self, str):
-        str = str.replace('start -->','>')
-        return str.replace("""<style>
-<!--
-
--->
-</style>""", '')
-
-    def process_html(self):
-        try:
-            file = open( self.html_file )
-        except :
-            traceback.print_exc(file=sys.stdout)
-            logging.warning(" Warning : Unresolved link to "+ self.html_file)
-            return '',''
-        html_contents = file.read()
-        file.close()
-
-        #rename the file
-        #shutil.move(self.html_file, self.html_file+'~')
-
-        html_contents = self.pre_process_html(html_contents)
-
-        try:
-            self.feed( html_contents )
-        except Exception as err:
-            msg = 'Error while parsing file %s : %s ' % (self.html_file, str(err))
-            traceback.print_exc(file=sys.stdout)
-            sys.stderr.write(msg+'\n')
-            logging.critical(msg)
-
-        anchor = os.path.split(self.html_file)[-1].split('.')[0]
-
-        self.content = self.content.strip()
-        return self.content, anchor
-        
 class CWHTMLParser(HTMLParser):
     "complete works html parser, combines the files to produce a single one, ideal for amazon book reader"
     
@@ -172,13 +62,13 @@ class CWHTMLParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         #logging.debug("{ %s " % tag)
 
+        if tag in IGNORE_TAGS:
+            self.ignore_data = 1;
+            return;
+        
         # skip unsupported html tags by amazon DTP
         if tag not in DTP_SUPPORTED_ATTRIBS:
             logging.debug(" ignoring %s " % tag );
-            return;
-
-        if tag in IGNORE_TAGS:
-            self.ignore_data = 1;
             return;
 
         if tag == 'a':
@@ -186,19 +76,25 @@ class CWHTMLParser(HTMLParser):
                 if name=='href' and value=='#blank':
                     self.process_footnote(attrs)
                     return
-            
+
+                   
         # remove the attributes that are not necessary
         attrs_ori = attrs
         attrs_filtered = []
         htmlClasses = ''
         for (attrib,value) in attrs:
             if attrib in DTP_SUPPORTED_ATTRIBS[tag]:
+                # preprocess href of a tag, which point to _frame pages
+                if tag=='a' and attrib=='href' and value.endswith('_frame.htm'):
+                    value = get_contents_href(self.html_file, value)
                 attrs_filtered.append( (attrib,value) )
             # retain small class for p tags, they are the nav on top
             elif tag=='p' and attrib=='class' and value.lower()=='small' and self.nav_added==0: 
                 htmlClasses += ' nav '
                 self.nav_added = 1
-            elif attrib=='style' and value.find('margin')!=-1 :
+            elif attrib=='class' and value.lower()=='msobodytext':
+                htmlClasses += ' center '
+            elif attrib=='style' and value.find('margin')!=-1 and tag!='table':
                 htmlClasses += ' poem '
             elif attrib=='align' and tag != 'img': #w3c validator
                 if value=='center' or value=='centre':
@@ -206,7 +102,7 @@ class CWHTMLParser(HTMLParser):
                 elif value=='right':
                     htmlClasses += ' right '
                 else:
-                    print('unhandled align %s' % value)
+                    pass
 
             
         if len(htmlClasses.strip()) : 
@@ -251,7 +147,7 @@ class CWHTMLParser(HTMLParser):
         self.content += data;
 
     def handle_comment(self, data):
-        print ( 'comment: ' + data )
+        #print ( 'comment: ' + data )
         self.content += '<!--' + data + '-->'
 
     def handle_charref(self, name):
@@ -289,33 +185,20 @@ class CWHTMLParser(HTMLParser):
 
         str = re.sub('<p( class="\w+")*>\s*<h2>','<h2>', str)
         str = re.sub('</h2>\s*</p>','</h2>', str)
-
-        if self.html_file.endswith('_contents.htm'):
-            str = str.replace('<div>','<ol>')
-            str = str.replace('<p>','<li>')
-            str = str.replace('</p>','</li>')
-            str = str.replace('</div>','</ol>')
-            str = str.replace('<br>','')
-            str = str.replace('<br/>','')
-            str = re.sub('<li>\s*<h2>','<h2>', str)
-            str = re.sub('</h2>\s*</li>','</h2>', str)
-
-        #replace all caps by title case
-        """
-        upperCases = []
-        tmp = str
-        while True:
-            m = re.search('[A-Z]{2,}', tmp)
-            if None==m :
-                break;
-            upperCases.append( m.group(0) )
-            tmp = tmp.replace(m.group(0),'')
-
-        for word in upperCases:
-            if re.search('^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$',word) == None:
-                str = str.replace(word, word.title())
-        """
-
+        if str.find('<head') == -1:
+            str = str.replace('<html>', '<html>\n<head></head>')
+            print('|---no head in this file.')
+        #Add the style if absent.
+        if str.find('<link')==-1 and str.find('rel="stylesheet"')==-1:
+            main_css_path = ('../' * self.html_file.count('\\'))+'main.css'
+            str = str.replace('<head>', \
+                    '<head>\n<link rel="stylesheet" type="text/css" href="%s">' % main_css_path)
+            
+            
+        # manually add meta tag.
+        if str.find('<meta') == -1:
+            str = str.replace('<head>','<head>\n<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">')
+            
         # replace the css with main css
         for (a,b) in CSS_REPLACEMENTS:
             str = str.replace( a, b)
@@ -341,6 +224,7 @@ class CWHTMLParser(HTMLParser):
             traceback.print_exc(file=sys.stdout)
             sys.stderr.write(msg+'\n')
             logging.critical(msg)
+            sys.exit(-2)
         
         return  self.post_process_html(self.content)
 
@@ -348,15 +232,6 @@ def copy_files( src, dst, filter):
     files = glob.glob(os.path.join(src, filter))
     for f in files:
         shutil.copy( f, os.path.join(dst,os.path.split(f)[-1]) )
-
-def create_validation_script( dst ):
-    files = glob.glob(os.path.join(dst, '*.htm'))
-    val_fp = open('validate.bat', 'w')
-    for f in files:
-        val_fp.write( 'curl -sF "uploaded_file=@%s;type=text/html" -F output=json http://validator.w3.org/check \n'
-                    % f )
-    val_fp.close()
-
 
 def main():
     logging.basicConfig( filename=sys.argv[0]+'.log', level=logging.DEBUG )
@@ -388,8 +263,10 @@ def main():
             if os.path.isfile(htm_file) == False: 
                 print( htm_file + " is not a file : ERROR")
                 continue
-            if ( re.search('_[a-zA-Z].htm$',htm_file) != None and os.path.exists(re.sub('_[a-zA-Z].htm$','.htm',htm_file)) ) or htm_file.find('picosearch.htm')!=-1:
-                print('     avoid footnote %s' % htm_file )
+            if ( re.search('_[a-zA-Z].htm$',htm_file) != None and \
+                    os.path.exists(re.sub('_[a-zA-Z].htm$','.htm',htm_file)) ) or \
+                    htm_file.find('picosearch.htm')!=-1 or htm_file.endswith('_frame.htm'):
+                print('     avoid %s' % htm_file )
                 continue
             print( "Processing %s ..." % htm_file )
             out_filename = os.path.normpath( os.path.join( out_dir, os.path.split(htm_file)[-1] ) )
@@ -402,16 +279,7 @@ def main():
 
         copy_files( root, out_dir, '*.jpg')
         copy_files( root, out_dir, '*.pdf')
-        #create_validation_script( sys.argv[2] )
 
 if __name__ == "__main__":
     main()
         
-    
-        
-        
-#TODO
-# regex in all caps title
-# footnote avoidance suspension.
-# regex for roman.
-# All caps to title case processing.
