@@ -5,6 +5,9 @@ import logging
 from html.parser import HTMLParser
 from ParsingRules import *
 
+IGNORE_TAGS = [ 'title', 'style']
+ALLOWED_TAGS = ['i', 'img', 'br']
+
 class FootnoteHTMLParser(HTMLParser):
     """ ignores the tags, and puts the text content,
         so that it can be aggregated as a footnote easily.
@@ -18,7 +21,7 @@ class FootnoteHTMLParser(HTMLParser):
         
     def handle_starttag(self, tag, attrs):
         #logging.debug("{ %s " % tag)
-        if tag == 'title':
+        if tag == 'title' or tag == 'style':
             self.ignore_data = 1
         if tag == 'br':
             self.content += '<%s/>' % tag;
@@ -28,10 +31,10 @@ class FootnoteHTMLParser(HTMLParser):
                 if attrib in DTP_SUPPORTED_ATTRIBS[tag]:
                     attrs_filtered.append( (attrib,value) )
             strattrs = "".join([' %s="%s"' % (name, value) for name, value in attrs])
-            self.content += '<img %s>' % strattrs
+            self.content += ('<%s %s>' % (tag,strattrs)).replace(' >','>')
 
     def handle_endtag(self, tag):
-        if tag == 'title':
+        if tag == 'title' or tag=='style':
             self.ignore_data = 0
 
     def handle_data(self, data):
