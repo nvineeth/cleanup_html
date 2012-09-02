@@ -12,7 +12,7 @@ CSS_REPLACEMENTS = [
 
 DTP_SUPPORTED_ATTRIBS = {
         'a':[	'href', 'id', 'name' ],
-        'b':['id'],
+        #'b':['id'],
         'big':[],
         'blockquote':['id'],
         'body':	[],
