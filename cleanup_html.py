@@ -11,6 +11,42 @@ import urllib.parse
 from FootnoteParser import *
 from ParsingRules import * 
 
+HREF_CORRECTIONS = [
+        ('066_dr_nanjunda_rao.htm','066_nanjunda_rao.htm'),
+        ('complete_works_contents.htm','complete_works.htm')
+        ]
+
+FOOTNORE_FILE_EXCEPTIONS = ['the_gita_i.htm', 'the_gita_ii.htm', 'the_gita_iii.htm']
+FILES_TO_AVOID = ['vol_1.htm', 'vol_2.htm', 'vol_3.htm', 'vol_4.htm', 'vol_5.htm', \
+        'vol_6.htm', 'vol_7.htm', 'vol_8.htm', 'vol_9.htm', \
+        'and_let_shyama_dance_a.htm',\
+        'and_let_shyama_dance_b.htm',\
+        'and_let_shyama_dance_c.htm',\
+        'and_let_shyama_dance_d.htm',\
+        'and_let_shyama_dance_e.htm',\
+        'and_let_shyama_dance_f.htm',\
+        'and_let_shyama_dance_g.htm',\
+        'and_let_shyama_dance_h.htm',\
+        'and_let_shyama_dance_i.htm',\
+        'and_let_shyama_dance_j.htm']
+
+def can_copy_file( htm_file ):
+    "Indicates if the html file can be copied"
+    html_filename = os.path.split(htm_file)[-1]
+    # avoid footnotes files
+    if re.search('_[a-zA-Z].htm$',htm_file) != None and \
+        os.path.exists(re.sub('_[a-zA-Z].htm$','.htm',htm_file)) or \
+        htm_file.find('picosearch.htm')!=-1 or htm_file.endswith('_frame.htm'):
+        if not (html_filename in FOOTNORE_FILE_EXCEPTIONS):
+            print('     avoid %s' % htm_file )
+            return False
+
+    # other files to avoid
+    if html_filename in FILES_TO_AVOID:
+        return False
+    return True
+            
+
 def get_contents_href(html_file, href_link):
     "Opens the _frame.htm file and returns the contents file."
     href_path = os.path.normpath(os.path.join( os.path.split(html_file)[0], href_link))
@@ -105,8 +141,9 @@ class CWHTMLParser(HTMLParser):
                 if tag=='a' and attrib=='href':
                     if value.endswith('_frame.htm'):
                         value = get_contents_href(self.html_file, value)
-                    elif value.endswith('complete_works_contents.htm'):
-                        value = value.replace('complete_works_contents.htm','complete_works.htm')
+                    for (link,correction) in HREF_CORRECTIONS:
+                        if value.endswith(link):
+                            value = value.replace(link, correction)
                 attrs_filtered.append( (attrib,value) )
             # retain small class for p tags, they are the nav on top
             elif tag=='p' and attrib=='class' and value.lower()=='small' and self.nav_added==0: 
@@ -180,11 +217,14 @@ class CWHTMLParser(HTMLParser):
         return str
 
     def post_process_html(self,str):
-        str = str.replace('start -->','>')
         str = re.sub(">\s*<<\s*<", ' class="arrow"> &larr; <', str);
         str = re.sub(">\s*>>\s*", ' class="arrow"> &rarr;', str);
         str = re.sub(">\s*&lt;\s*&lt;\s*<", ' class="arrow"> &larr; <', str);
         str = re.sub(">\s*&gt;\s*&gt;\s*", ' class="arrow"> &rarr;', str);
+        
+        # add a nav bar, if there are links to home.
+        if str.find('Home') != -1 and str.find('index.htm') != -1:
+            str = str.replace('<p class="right">', '<p class="nav">', 1)
 
 
         #rm noindex.
@@ -220,6 +260,12 @@ class CWHTMLParser(HTMLParser):
         # replace the css with main css
         for (a,b) in CSS_REPLACEMENTS:
             str = str.replace( a, b)
+
+        #ensure that body ends and html ends.
+        #if str.find('</body>') == -1 or str.find('</html>')==-1:
+        if str.find('</html>')==-1:
+            print("not body or end html tag found")
+            sys.exit(-2);
         
         return '<!DOCTYPE html>\n' + str;
 
@@ -281,10 +327,7 @@ def main():
             if os.path.isfile(htm_file) == False: 
                 print( htm_file + " is not a file : ERROR")
                 continue
-            if ( re.search('_[a-zA-Z].htm$',htm_file) != None and \
-                    os.path.exists(re.sub('_[a-zA-Z].htm$','.htm',htm_file)) ) or \
-                    htm_file.find('picosearch.htm')!=-1 or htm_file.endswith('_frame.htm'):
-                print('     avoid %s' % htm_file )
+            if not can_copy_file(htm_file) :
                 continue
             print( "Processing %s ..." % htm_file )
             out_filename = os.path.normpath( os.path.join( out_dir, os.path.split(htm_file)[-1] ) )
