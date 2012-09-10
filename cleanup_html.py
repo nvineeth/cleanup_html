@@ -213,6 +213,12 @@ class CWHTMLParser(HTMLParser):
         self.content += '&%s;' % name
 
     def pre_process_html(self, str):
+        # the frst occurance of b are made headings.
+        str = str.replace('<htm>','<html>')
+        str = str.replace('</htm>','</html>')
+        str = str.replace('"onMouseout', '" onMouseout')
+        str = str.replace('<b>','<h2>',1)
+        str = str.replace('</b>','</h2>',1)
         str = str.replace('start -->','>')
         return str
 
@@ -262,9 +268,11 @@ class CWHTMLParser(HTMLParser):
             str = str.replace( a, b)
 
         #ensure that body ends and html ends.
-        #if str.find('</body>') == -1 or str.find('</html>')==-1:
-        if str.find('</html>')==-1:
+        if str.find('</body>') == -1 or str.find('</html>')==-1:
+        #if str.find('</html>')==-1:
+            print( self.content)
             print("not body or end html tag found")
+            os.system("gvim.exe %s" % self.html_file)
             sys.exit(-2);
         
         return '<!DOCTYPE html>\n' + str;

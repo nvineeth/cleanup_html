@@ -63,6 +63,7 @@ class FootnoteHTMLParser(HTMLParser):
         except :
             traceback.print_exc(file=sys.stdout)
             logging.warning(" Warning : Unresolved link to "+ self.html_file)
+            sys.exit(-5)
             return '',''
         html_contents = file.read()
         file.close()
