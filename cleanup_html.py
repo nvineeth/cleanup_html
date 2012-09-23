@@ -82,6 +82,7 @@ class CWHTMLParser(HTMLParser):
                 match_obj = re.search('[a-zA-Z0-9_]+.htm',value)
                 if match_obj == None:
                     logging.critical('footnote htm not found')
+                    sys.exit(-1)
                     return
                 footnote_file = match_obj.group(0)
 
@@ -162,6 +163,9 @@ class CWHTMLParser(HTMLParser):
             
         if len(htmlClasses.strip()) : 
             htmlClasses = htmlClasses.replace('  ',' ')
+            # right and poem cannot exist together.
+            if htmlClasses.find('right') != -1 and htmlClasses.find('poem')!= -1:
+                htmlClasses = htmlClasses.replace('poem','')
             attrs_filtered.append( ('class', htmlClasses.strip()) )
 
         attrs = attrs_filtered
@@ -225,8 +229,8 @@ class CWHTMLParser(HTMLParser):
     def post_process_html(self,str):
         str = re.sub(">\s*<<\s*<", ' class="arrow"> &larr; <', str);
         str = re.sub(">\s*>>\s*", ' class="arrow"> &rarr;', str);
-        str = re.sub(">\s*&lt;\s*&lt;\s*<", ' class="arrow"> &larr; <', str);
-        str = re.sub(">\s*&gt;\s*&gt;\s*", ' class="arrow"> &rarr;', str);
+        str = re.sub("\s*&lt;\s*&lt;\s*", '&larr;', str);
+        str = re.sub("\s*&gt;\s*&gt;\s*", '&rarr;', str);
         
         # add a nav bar, if there are links to home.
         if str.find('Home') != -1 and str.find('index.htm') != -1:
