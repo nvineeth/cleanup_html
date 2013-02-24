@@ -1,0 +1,23 @@
+1. fixing class=rights with space, collides with the salutation.
+<p class="center"><i>To Mrs. G. W. Hale</i></p>
+
+<p class="right">C/O MRS. OLE BULL<br>
+168 BRATTLE STREET
+</p>
+
+<p class="right">CAMBRIDGE, MASS.</p>
+
+<p class="right"><i>6 December
+1894</i></p>
+
+
+
+
+<h2>LXXVI</h2>
+<p class="center"><i>To
+the Maharaja of Limdi,</i></p>
+
+<p class="center"><i>Cathiawad,
+Bombay</i></p>
+<p class="right">CHICAGO</p>
+--------------------------------------------------
