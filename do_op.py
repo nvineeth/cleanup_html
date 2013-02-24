@@ -2,11 +2,14 @@ import os
 import sys
 import re
 
-TEST = 1
+TEST = 0
 
 def do_op(html):
     html_replaced = html
-    html_replaced = re.sub('\s*<br>\s*(&nbsp;)*\s*</p>','</p>', html_replaced)
+    if html.find("jquery") == -1:
+        html_replaced = html.replace( "</head>", '<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>\n<script src="/search.js"></script>\n</head>')
+
+    #html_replaced = re.sub('\s*<br>\s*(&nbsp;)*\s*</p>','</p>', html_replaced)
     #html_replaced = re.sub('(([^;])&nbsp;([^&]))',' ', html_replaced)
     #html_replaced = html_replaced.replace('<p></p>','')
     if html_replaced != html:
